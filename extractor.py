@@ -18,7 +18,7 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
             return False, f"Error al leer el Excel de equivalencias: {e}"
 
     datos_articulos = []
-    descuento_global_ivrea = 0  # Variable temporal por si es Ivrea
+    descuento_global_ivrea = 0
 
     try:
         with pdfplumber.open(ruta_pdf) as pdf:
@@ -44,16 +44,21 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
             elif "IVREA" in texto_identificacion or "SIBIU" in texto_identificacion:
                 editorial = "IVREA"
                 cabecera_tabla = "ARTÍCULO DESCRIPCIÓN COD. BARRAS CANTIDAD PRECIO UNIT. IMPORTE"
-                # RegEx para Ivrea:
-                # ^\S+\s+.*?\s+(\d{13})\s+([\d.,]+)\s+\$\s+([\d.,]+)
-                # Salta código interno, agarra título, captura los 13 números del código de barras (1), 
-                # captura la cantidad decimal (2), salta el signo $ y captura el precio unitario (3)
                 patron = r"^\S+\s+.*?\s+(\d{13})\s+([\d.,]+)\s+\$\s+([\d.,]+)"
                 
-                # Buscamos de antemano si en esta página está el descuento general (ej: DESCUENTO: -45,00 %)
                 match_desc = re.search(r"DESCUENTO:\s+-?([\d.,]+)\s*%", texto_identificacion)
                 if match_desc:
                     descuento_global_ivrea = int(float(match_desc.group(1).replace(',', '.')))
+                    
+            elif "ILHSA" in texto_identificacion or "ATENEO" in texto_identificacion:
+                editorial = "ILHSA"
+                cabecera_tabla = "ISBN TITULO CANTIDAD PRECIO UNITARIO ALICUOTA IVA % DTO DESCUENTO IMPORTE NETO"
+                # RegEx para Ilhsa:
+                # ^(\d{13}) -> Captura los 13 dígitos del ISBN (1) que vienen pegados al título
+                # .*?\s+(\d+) -> Salta el título y captura la Cantidad (2)
+                # \s+([\d.,]+) -> Captura el Precio Unitario (3)
+                # \s+\d+\s+(\d+) -> Salta la alícuota de IVA y captura el % Descuento (4)
+                patron = r"^(\d{13}).*?\s+(\d+)\s+([\d.,]+)\s+\d+\s+(\d+)"
                 
             else:
                 return False, "Editorial no reconocida en el encabezado del PDF."
@@ -77,8 +82,10 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                         continue
                     
                     if empezar_a_leer_libros:
-                        # Condiciones de corte
+                        # Condiciones de corte según editorial
                         if editorial == "IVREA" and ("SUB. TOTAL:" in linea or "Total Libros:" in linea):
+                            break
+                        if editorial == "ILHSA" and ("REGIMEN DE TRANSPARENCIA" in linea or "SUBTOTAL $:" in linea):
                             break
                         if "Total Bruto" in linea or "TOTAL $" in linea or "TOTAL EJEMPLARES" in linea or "SON:" in linea:
                             break
@@ -108,12 +115,16 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                                 
                             elif editorial == "IVREA":
                                 codigo_detectado = str(resultado.group(1)).strip()
-                                # Convertimos '1,00' -> 1.0 -> 1
                                 cantidad_sucia = resultado.group(2).replace('.', '').replace(',', '.')
                                 cantidad = int(float(cantidad_sucia))
                                 precio_unitario = resultado.group(3)
-                                # Le aplicamos el descuento que cazamos del pie de la factura
                                 descuento = descuento_global_ivrea
+                                
+                            elif editorial == "ILHSA":
+                                codigo_detectado = str(resultado.group(1)).strip()
+                                cantidad = int(resultado.group(2))
+                                precio_unitario = resultado.group(3)
+                                descuento = int(resultado.group(4))
                             
                             # Mapeo de equivalencias
                             if codigo_detectado in base_equivalencias:
