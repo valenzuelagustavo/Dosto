@@ -1,0 +1,9 @@
+# Archivos de datos privados o de prueba
+*.xlsx
+*.pdf
+
+# Carpetas temporales que genera PyInstaller y Python
+__pycache__/
+build/
+dist/
+*.spec
