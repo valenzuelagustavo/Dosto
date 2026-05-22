@@ -144,14 +144,26 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                 cabecera_tabla = "Código Concepto Colección Cantidad"
                 patron = r"^(\d{13})\s+.*?\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+"
                 
-            elif "HELIASTA" in texto_identificacion:
+            elif "HELIASTA" in texto_identificacion or "37250" in texto_identificacion:
                 editorial = "HELIASTA"
                 cabecera_tabla = "PLAZO DE PAGO"
                 patron = r"^(\d+)\s+(\d{13})\s+.*?\s+([\d.,]+)\s+([\d.,]+)$"
                 match_desc = re.search(r"Desc\.\s+([\d.,]+)\s*%", texto_identificacion)
                 if match_desc:
                     descuento_global_factura = int(float(match_desc.group(1).replace(',', '.')))
-                    
+
+            elif "SANTILLANA" in texto_identificacion:
+                editorial = "SANTILLANA"
+                cabecera_tabla = "Artículo Cant. Descripción Unitario Bruto %dto Subtotal"
+                # RegEx: Código interno (1), Cantidad (2), salta texto, Precio Unitario (3), % Descuento (4)
+                patron = r"^(\d+)\s+(\d+)\s+.*?([\d.,]+)\s+[\d.,]+\s+([\d.,]+)\s+[\d.,]+"
+
+            elif "MAIPUE" in texto_identificacion or "10970866" in texto_identificacion:
+                editorial = "MAIPUE"
+                cabecera_tabla = "Descripción Precio Desc Total" # Cabecera estándar del sistema
+                # RegEx Maipue: ISBN (1), salta título, Precio Lista (2), % Descuento (3), salta el Neto
+                patron = r"^(\d{13})\s+.*?\s+([\d.,]+)\s+([\d.,]+)\s+\$\s+[\d.,]+$"
+
             else:
                 return False, "Editorial no reconocida en el encabezado del PDF."
 
@@ -203,7 +215,11 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                             break
                         if editorial == "HELIASTA" and "Subtotal" in linea:
                             break
+                        if editorial == "MAIPUE" and ("Lineas:" in linea or "Total:" in linea):
+                            break
                         if "TOTAL $" in linea or "TOTAL EJEMPLARES" in linea or "SON:" in linea:
+                            break
+                        if editorial == "SANTILLANA" and "Total Bruto" in linea:
                             break
                             
                         resultado = re.search(patron, linea)
@@ -321,6 +337,18 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                                 cantidad = int(resultado.group(2))
                                 precio_unitario = resultado.group(3)
                                 descuento = int(resultado.group(4))
+                            
+                            elif editorial == "SANTILLANA":
+                                codigo_detectado = str(resultado.group(1)).strip()
+                                cantidad = int(resultado.group(2))
+                                precio_unitario = resultado.group(3)
+                                descuento = int(float(resultado.group(4).replace(',', '.')))
+                            
+                            elif editorial == "MAIPUE":
+                                codigo_detectado = str(resultado.group(1)).strip()
+                                cantidad = 1 # Las líneas de este formato liquidan por unidad en la tabla
+                                precio_unitario = resultado.group(2)
+                                descuento = int(float(resultado.group(3).replace(',', '.')))
 
                             # --- CRUCE POR DICCIONARIO DE EQUIVALENCIAS ---
                             if codigo_detectado in base_equivalencias:
