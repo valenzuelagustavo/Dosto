@@ -1,7 +1,7 @@
 import pdfplumber
 
 # Poné el nombre de la factura que te dio la alerta
-archivo_pdf = "FacturaC 0013-00052156_07-05-2026 13-05-06 Ivrea.pdf" 
+archivo_pdf = "4-20931 13042026 Losada.pdf" 
 
 print(f"Abriendo {archivo_pdf} para analizar su estructura...\n")
 
