@@ -40,12 +40,19 @@ def comparar_devolucion_masiva(lista_rutas_nc, lista_rutas_remitos, ruta_equival
             elif "HELIASTA" in msg.upper(): editorial_detectada = "Heliasta"
 
             # Recolectar títulos vinculando el ISBN (si la columna existe en el procesado intermedio)
-            col_titulo_tmp = next((c for c in df_tmp.columns if 'DESC' in c.upper() or 'TITULO' in c.upper()), None)
+            col_titulo_tmp = None
+            for c in df_tmp.columns:
+                c_upper = c.upper()
+                if ('TITULO' in c_upper or 'DESC' in c_upper) and 'DESCUENTO' not in c_upper and 'DESC.%' not in c_upper:
+                    col_titulo_tmp = c
+                    break
+
             if col_titulo_tmp:
                 for _, fila in df_tmp.iterrows():
                     isbn_f = str(fila['ISBN']).strip()
                     desc_f = str(fila[col_titulo_tmp]).strip()
-                    if isbn_f and desc_f and desc_f.upper() != "NAN":
+                    # Si el título es un número puro de dos dígitos (como el 40 del descuento), lo ignoramos
+                    if isbn_f and desc_f and desc_f.upper() != "NAN" and not (desc_f.isdigit() and len(desc_f) <= 2):
                         mapeo_titulos[isbn_f] = desc_f
 
             df_tmp_agrupado = df_tmp.groupby('ISBN', as_index=False)['Cantidad'].sum()
