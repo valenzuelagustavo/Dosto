@@ -2,7 +2,7 @@ import os
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from extractor import procesar_factura_pdf
-from comparador import comparar_devolucion_multiple
+from comparador import comparar_devolucion_masiva
 
 # Configuración estética base de CustomTkinter
 ctk.set_appearance_mode("System")  # Adopta el modo del sistema (Oscuro/Claro)
@@ -19,8 +19,8 @@ class AppDosto(ctk.CTk):
         # Variables para el Modo Extractor Individual
         self.ruta_pdf_individual = ""
 
-        # Variables para el Modo Comparador Múltiple
-        self.ruta_pdf_nc = ""
+        # Variables para el Modo Comparador Múltiple (Estructura de listas gigantes)
+        self.lista_rutas_nc = []
         self.lista_rutas_remitos = []
 
         # --- CREACIÓN DE PESTAÑAS (TABVIEW) ---
@@ -76,57 +76,78 @@ class AppDosto(ctk.CTk):
         self.btn_procesar_ind.configure(state="normal", text="Procesar Documento")
 
     # =========================================================================
-    # 📊 PANEL 2: COMPARADOR DE DEVOLUCIONES (Lógica nueva)
+    # 📊 PANEL 2: COMPARADOR DE DEVOLUCIONES (Soporte Masivo Multi-Origen)
     # =========================================================================
     def setup_tab_comparador(self):
         tab = self.tabview.tab("Comparador de Devoluciones")
 
         lbl_titulo = ctk.CTkLabel(tab, text="Control Cruzado de Devoluciones", font=ctk.CTkFont(size=18, weight="bold"))
-        lbl_titulo.pack(pady=10)
+        lbl_titulo.pack(pady=5)
 
-        lbl_desc = ctk.CTkLabel(tab, text="Cruza una Nota de Crédito contra uno o varios remitos del sistema.\nConsolida cantidades del mismo libro y detecta faltantes o sobrantes.", font=ctk.CTkFont(size=12))
-        lbl_desc.pack(pady=5)
+        # --- CONTENEDOR DE DOS COLUMNAS SIMÉTRICAS ---
+        frame_listas = ctk.CTkFrame(tab, fg_color="transparent")
+        frame_listas.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # --- SECTOR NOTA DE CRÉDITO ---
-        frame_nc = ctk.CTkFrame(tab)
-        frame_nc.pack(fill="x", padx=20, pady=10)
+        # COLUMNA IZQUIERDA: NOTAS DE CRÉDITO (PDF)
+        frame_col_nc = ctk.CTkFrame(frame_listas)
+        frame_col_nc.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
-        self.btn_cargar_nc = ctk.CTkButton(frame_nc, text="1. Cargar NC (PDF)", command=self.cargar_pdf_nc, width=150)
-        self.btn_cargar_nc.pack(side="left", padx=10, pady=10)
+        btn_add_nc = ctk.CTkButton(frame_col_nc, text="1. Añadir NCs (PDF)", command=self.sumar_nc_lista, fg_color="#1f538d")
+        btn_add_nc.pack(pady=10, padx=10, fill="x")
 
-        self.lbl_status_nc = ctk.CTkLabel(frame_nc, text="No se cargó la Nota de Crédito", text_color="gray", anchor="w")
-        self.lbl_status_nc.pack(side="left", fill="x", expand=True, padx=10)
+        self.txt_lista_nc = ctk.CTkTextbox(frame_col_nc, height=120, font=ctk.CTkFont(size=11))
+        self.txt_lista_nc.pack(fill="both", expand=True, padx=10, pady=5)
+        self.txt_lista_nc.insert("0.0", "Ninguna NC cargada...\nAgrega archivos .pdf")
+        self.txt_lista_nc.configure(state="disabled")
 
-        # --- SECTOR REMITOS MÚLTIPLES ---
-        frame_remitos = ctk.CTkFrame(tab)
-        frame_remitos.pack(fill="both", expand=True, padx=20, pady=5)
+        btn_clear_nc = ctk.CTkButton(frame_col_nc, text="Limpiar NCs", command=self.limpiar_cola_nc, fg_color="#a83232", hover_color="#822424")
+        btn_clear_nc.pack(pady=5, padx=10, fill="x")
 
-        # Subframe para los botones de acción de remitos
-        frame_botones_r = ctk.CTkFrame(frame_remitos, fg_color="transparent")
-        frame_botones_r.pack(side="left", padx=10, pady=10, fill="y")
+        # COLUMNA DERECHA: REMITOS INTERNOS (EXCEL)
+        frame_col_rem = ctk.CTkFrame(frame_listas)
+        frame_col_rem.pack(side="right", fill="both", expand=True, padx=5, pady=5)
 
-        self.btn_sumar_remito = ctk.CTkButton(frame_botones_r, text="2. Añadir Remito (Excel)", command=self.sumar_remito_lista, width=160, fg_color="#1f538d")
-        self.btn_sumar_remito.pack(pady=5)
+        btn_add_rem = ctk.CTkButton(frame_col_rem, text="2. Añadir Remitos (Excel)", command=self.sumar_remito_lista, fg_color="#1f538d")
+        btn_add_rem.pack(pady=10, padx=10, fill="x")
 
-        self.btn_limpiar_remitos = ctk.CTkButton(frame_botones_r, text="Limpiar Cola", command=self.limpiar_cola_remitos, width=160, fg_color="#a83232", hover_color="#822424")
-        self.btn_limpiar_remitos.pack(pady=5)
-
-        # Caja de texto para simular la lista de archivos cargados
-        self.txt_lista_remitos = ctk.CTkTextbox(frame_remitos, height=100, font=ctk.CTkFont(size=11))
-        self.txt_lista_remitos.pack(side="right", fill="both", expand=True, padx=10, pady=10)
-        self.txt_lista_remitos.insert("0.0", "Cola de remitos vacía...\nAgrega uno o más archivos .xlsx")
+        self.txt_lista_remitos = ctk.CTkTextbox(frame_col_rem, height=120, font=ctk.CTkFont(size=11))
+        self.txt_lista_remitos.pack(fill="both", expand=True, padx=10, pady=5)
+        self.txt_lista_remitos.insert("0.0", "Ningún remito cargado...\nAgrega archivos .xlsx")
         self.txt_lista_remitos.configure(state="disabled")
 
+        btn_clear_rem = ctk.CTkButton(frame_col_rem, text="Limpiar Remitos", command=self.limpiar_cola_remitos, fg_color="#a83232", hover_color="#822424")
+        btn_clear_rem.pack(pady=5, padx=10, fill="x")
+
         # --- BOTÓN DE EJECUCIÓN FINAL ---
-        self.btn_comparar = ctk.CTkButton(tab, text="Ejecutar Control de Discrepancias", command=self.ejecutar_comparador_masivo, state="disabled", fg_color="green", hover_color="darkgreen", height=45, font=ctk.CTkFont(size=14, weight="bold"))
+        self.btn_comparar = ctk.CTkButton(tab, text="Ejecutar Control de Discrepancias Masivo", command=self.ejecutar_comparador_masivo, state="disabled", fg_color="green", hover_color="darkgreen", height=45, font=ctk.CTkFont(size=14, weight="bold"))
         self.btn_comparar.pack(pady=15)
 
-    def cargar_pdf_nc(self):
-        ruta = filedialog.askopenfilename(filetypes=[("Archivos PDF", "*.pdf")])
-        if ruta:
-            self.ruta_pdf_nc = ruta
-            self.lbl_status_nc.configure(text=f"NC cargada: {os.path.basename(ruta)}", text_color="white")
+    # =========================================================================
+    # 🎛️ MÉTODOS DE SOPORTE INTERNOS (Alineados dentro de la clase AppDosto)
+    # =========================================================================
+    def sumar_nc_lista(self):
+        rutas = filedialog.askopenfilenames(filetypes=[("Archivos PDF", "*.pdf")])
+        if rutas:
+            for ruta in rutas:
+                if ruta not in self.lista_rutas_nc:
+                    self.lista_rutas_nc.append(ruta)
+            self.actualizar_vista_lista_nc()
             self.verificar_listo_para_comparar()
+
+    def limpiar_cola_nc(self):
+        self.lista_rutas_nc = []
+        self.actualizar_vista_lista_nc()
+        self.verificar_listo_para_comparar()
+
+    def actualizar_vista_lista_nc(self):
+        self.txt_lista_nc.configure(state="normal")
+        self.txt_lista_nc.delete("0.0", "end")
+        if not self.lista_rutas_nc:
+            self.txt_lista_nc.insert("0.0", "Ninguna NC cargada...\nAgrega archivos .pdf")
+        else:
+            for idx, ruta in enumerate(self.lista_rutas_nc, start=1):
+                self.txt_lista_nc.insert("end", f"[{idx}] {os.path.basename(ruta)}\n")
+        self.txt_lista_nc.configure(state="disabled")
 
     def sumar_remito_lista(self):
         rutas = filedialog.askopenfilenames(filetypes=[("Archivos Excel", "*.xlsx")])
@@ -145,38 +166,35 @@ class AppDosto(ctk.CTk):
     def actualizar_vista_lista_remitos(self):
         self.txt_lista_remitos.configure(state="normal")
         self.txt_lista_remitos.delete("0.0", "end")
-        
         if not self.lista_rutas_remitos:
-            self.txt_lista_remitos.insert("0.0", "Cola de remitos vacía...\nAgrega uno o más archivos .xlsx")
+            self.txt_lista_remitos.insert("0.0", "Ningún remito cargado...\nAgrega archivos .xlsx")
         else:
             for idx, ruta in enumerate(self.lista_rutas_remitos, start=1):
                 self.txt_lista_remitos.insert("end", f"[{idx}] {os.path.basename(ruta)}\n")
-                
         self.txt_lista_remitos.configure(state="disabled")
 
     def verificar_listo_para_comparar(self):
-        # Para poder ejecutar el control necesitamos obligatoriamente la NC y al menos un remito
-        if self.ruta_pdf_nc and self.lista_rutas_remitos:
+        # Valida que la cola tenga por lo menos una NC y un Remito cargado para activarse
+        if self.lista_rutas_nc and self.lista_rutas_remitos:
             self.btn_comparar.configure(state="normal")
         else:
             self.btn_comparar.configure(state="disabled")
 
     def ejecutar_comparador_masivo(self):
-        self.btn_comparar.configure(state="disabled", text="Comparando y consolidando...")
+        self.btn_comparar.configure(state="disabled", text="Consolidando universos...")
         self.update_idletasks()
         
-        exito, msg = comparar_devolucion_multiple(self.ruta_pdf_nc, self.lista_rutas_remitos)
+        exito, msg = comparar_devolucion_masiva(self.lista_rutas_nc, self.lista_rutas_remitos)
         
         if exito:
             messagebox.showinfo("¡Control Completado!", msg)
-            self.limpiar_cola_remitos()  # Limpia la cola tras un proceso exitoso
-            self.ruta_pdf_nc = ""
-            self.lbl_status_nc.configure(text="No se cargó la Nota de Crédito", text_color="gray")
+            self.limpiar_cola_remitos()
+            self.limpiar_cola_nc()
         else:
             messagebox.showerror("Error en el Proceso", msg)
-            
-        self.btn_comparar.configure(state="normal", text="Ejecutar Control de Discrepancias")
+            self.btn_comparar.configure(state="normal", text="Ejecutar Control de Discrepancias Masivo")
 
+# --- ARRANQUE NATIVO DEL PROGRAMA ---
 if __name__ == "__main__":
     app = AppDosto()
     app.mainloop()
