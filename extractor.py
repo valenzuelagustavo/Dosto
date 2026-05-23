@@ -164,6 +164,13 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                 # RegEx Maipue: ISBN (1), salta título, Precio Lista (2), % Descuento (3), salta el Neto
                 patron = r"^(\d{13})\s+.*?\s+([\d.,]+)\s+([\d.,]+)\s+\$\s+[\d.,]+$"
 
+            elif "PENGUIN RANDOM HOUSE" in texto_identificacion or "33-52701975-9" in texto_identificacion:
+                editorial = "PENGUIN"
+                cabecera_tabla = "Codigo Titulo Fact. Asig. Cant. Prec.Un Desc.% Importe"
+                # RegEx Penguin: Soporta el '#' opcional, captura ISBN (1), salta título, captura Cantidad (2), 
+                # captura Precio Unitario (3), captura Descuento numérico ignorando el guion (4)
+                patron = r"^#?(\d{13})\s+.*?\s+(\d+)\s+([\d.,]+)\s+(\d+)-?\s+[\d.,]+$"
+
             else:
                 return False, "Editorial no reconocida en el encabezado del PDF."
 
@@ -220,6 +227,8 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                         if "TOTAL $" in linea or "TOTAL EJEMPLARES" in linea or "SON:" in linea:
                             break
                         if editorial == "SANTILLANA" and "Total Bruto" in linea:
+                            break
+                        if editorial == "PENGUIN" and "Subtotal::" in linea:
                             break
                             
                         resultado = re.search(patron, linea)
@@ -350,6 +359,12 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                                 precio_unitario = resultado.group(2)
                                 descuento = int(float(resultado.group(3).replace(',', '.')))
 
+                            elif editorial == "PENGUIN":
+                                codigo_detectado = str(resultado.group(1)).strip()
+                                cantidad = int(resultado.group(2))
+                                precio_unitario = resultado.group(3)
+                                descuento = int(float(resultado.group(4).replace(',', '.')))
+                                
                             # --- CRUCE POR DICCIONARIO DE EQUIVALENCIAS ---
                             if codigo_detectado in base_equivalencias:
                                 isbn_final = base_equivalencias[codigo_detectado]
