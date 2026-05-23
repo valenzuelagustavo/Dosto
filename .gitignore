@@ -1,7 +1,7 @@
 # Archivos de datos privados o de prueba
 *.xlsx
 *.pdf
-*.txt
+formatos_crudos.txt
 
 # Carpetas temporales que genera PyInstaller y Python
 __pycache__/
