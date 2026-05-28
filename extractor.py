@@ -20,6 +20,8 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
     datos_articulos = []
     descuento_global_factura = 0
 
+    
+
     try:
         with pdfplumber.open(ruta_pdf) as pdf:
             # 2. DETECTOR DE EDITORIAL (Analiza la primera página)
@@ -176,11 +178,21 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
 
             print(f"[Extractor] Procesando con motor: {editorial}")
 
-            # 3. PROCESAMIENTO DE LAS PÁGINAS
+# 3. PROCESAMIENTO DE LAS PÁGINAS
             for numero_pagina, pagina in enumerate(pdf.pages, start=1):
                 texto_completo = pagina.extract_text()
                 if not texto_completo:
                     continue
+                    
+                # --- DETECTOR DE MARCAS FISCALES (DUPLICADO / TRIPLICADO) ---
+                # Tomamos las primeras líneas del texto extraído para revisar el encabezado
+                lineas_encabezado = texto_completo.split("\n")[:5]  # Miramos solo las primeras 5 líneas
+                texto_superior = "".join(lineas_encabezado).upper()
+                
+                if "DUPLICADO" in texto_superior or "TRIPLICADO" in texto_superior:
+                    print(f"[Extractor] Saltando página {numero_pagina}: Detectada marca de copia fiscal ({'DUPLICADO' if 'DUPLICADO' in texto_superior else 'TRIPLICADO'}).")
+                    continue
+                # ------------------------------------------------------------
                     
                 lineas = texto_completo.split("\n")
                 empezar_a_leer_libros = True if numero_pagina > 1 else False
@@ -196,7 +208,6 @@ def procesar_factura_pdf(ruta_pdf, ruta_equivalencias="equivalencias.xlsx"):
                         # Ignoramos líneas de transporte intermedia que rompen Guadal en multifactura
                         if editorial == "GUADAL" and "Transporte :" in linea:
                             continue
-                            
                         # Frenos de corte de seguridad
                         if editorial in ["SISTEMA_ESTANDAR_B", "VYR", "SISTEMA_RED_SATORI", "FCE"] and ("Lineas:" in linea or "Total:" in linea or "Cantidad de Ejemplares" in linea or "SubTotal Neto" in linea or "SUBTOTAL ARS" in linea):
                             break
